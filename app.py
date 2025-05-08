@@ -14,7 +14,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import classification_report, confusion_matrix, roc_curve, auc, silhouette_score
+from sklearn.metrics import confusion_matrix, roc_curve, auc, silhouette_score
 from statsmodels.tsa.arima.model import ARIMA
 from statsmodels.tsa.statespace.sarimax import SARIMAX
 import matplotlib.pyplot as plt
@@ -24,23 +24,31 @@ from streamlit_folium import folium_static
 import re
 from textblob import TextBlob
 from wordcloud import WordCloud
+import warnings
+
+# Ignorar advertencias para una salida más limpia
+warnings.filterwarnings("ignore")
 
 # Título de la aplicación
-st.title("Análisis de sentimientos en X para la comprensión multidimensional del mundo socio digital")
+st.title("Análisis de Sentimientos en X para la Comprensión Multidimensional del Mundo Socio Digital")
 st.subheader("Presenta: Lic. Kevin Roberto Torres Ruiz")
 st.subheader("Director: Dr. Luis Alberto Maciel Arellano")
 st.subheader("Codirector: Dr. Víctor Hugo Gualajara Estrada")
 
-# Carga de datos
-data_file = st.file_uploader("Sube tu archivo JSON (ej. LagosDeMoreno 8623.JSON)", type=["json"])
+# Carga de datos con manejo de errores mejorado
+data_file = st.file_uploader("Sube tu archivo JSON (ej. LagosDeMoreno_8623.json)", type=["json"])
 if not data_file:
     st.warning("Por favor, sube un archivo JSON para continuar.")
     st.stop()
 
 try:
     data = pd.read_json(data_file)
-except ValueError:
-    st.error("Error al leer el archivo JSON. Asegúrate de que tenga la estructura correcta.")
+    st.success("Archivo JSON cargado correctamente.")
+except ValueError as e:
+    st.error(f"Error al leer el archivo JSON: {str(e)}. Asegúrate de que tenga la estructura correcta.")
+    st.stop()
+except Exception as e:
+    st.error(f"Error inesperado al procesar el archivo: {str(e)}")
     st.stop()
 
 # Verificar columnas necesarias
@@ -101,61 +109,62 @@ if option == 'EDA':
 elif option == 'Regresión Lineal':
     st.header("Regresión Lineal (OLS)")
     Xc = sm.add_constant(X)
-    ols = sm.OLS(y, Xc).fit()
-    st.text(ols.summary())
+    try:
+        ols = sm.OLS(y, Xc).fit()
+        st.text(ols.summary())
 
-    resid = ols.resid
-    fitted = ols.fittedvalues
-    st.subheader("Verificación de Supuestos")
+        resid = ols.resid
+        st.subheader("Verificación de Supuestos")
 
-    # 1. Linealidad
-    st.write("**1. Linealidad**")
-    st.write("Gráficos de Dispersión para Linealidad")
-    fig, axes = plt.subplots(1, 3, figsize=(15, 5))
-    axes[0].scatter(data['Retweets'], data['Likes'], alpha=0.5)
-    axes[0].set_title('Likes vs Retweets')
-    axes[1].scatter(data['Views'], data['Likes'], alpha=0.5)
-    axes[1].set_title('Likes vs Views')
-    axes[2].scatter(data['Replies'], data['Likes'], alpha=0.5)
-    axes[2].set_title('Likes vs Replies')
-    st.pyplot(fig)
+        # 1. Linealidad
+        st.write("**1. Linealidad**")
+        st.write("Gráficos de Dispersión para Linealidad")
+        fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+        axes[0].scatter(data['Retweets'], data['Likes'], alpha=0.5)
+        axes[0].set_title('Likes vs Retweets')
+        axes[1].scatter(data['Views'], data['Likes'], alpha=0.5)
+        axes[1].set_title('Likes vs Views')
+        axes[2].scatter(data['Replies'], data['Likes'], alpha=0.5)
+        axes[2].set_title('Likes vs Replies')
+        st.pyplot(fig)
 
-    # 2. Independencia (Durbin-Watson)
-    st.write("**2. Independencia**")
-    dw = sm.stats.stattools.durbin_watson(resid)
-    st.write(f"Durbin-Watson stat: {dw:.3f}")
+        # 2. Independencia (Durbin-Watson)
+        st.write("**2. Independencia**")
+        dw = sm.stats.stattools.durbin_watson(resid)
+        st.write(f"Durbin-Watson stat: {dw:.3f}")
 
-    # 3. Homocedasticidad
-    st.write("**3. Homocedasticidad**")
-    bp_p = het_breuschpagan(resid, Xc)[1]
-    st.write(f"Breusch-Pagan p-value: {bp_p:.3f}")
+        # 3. Homocedasticidad
+        st.write("**3. Homocedasticidad**")
+        bp_p = het_breuschpagan(resid, Xc)[1]
+        st.write(f"Breusch-Pagan p-value: {bp_p:.3f}")
 
-    # 4. Normalidad
-    st.write("**4. Normalidad**")
-    st.write("Histograma y Q-Q Plot de Residuos")
-    fig, ax = plt.subplots(1, 2, figsize=(12, 5))
-    sns.histplot(resid, kde=True, ax=ax[0])
-    ax[0].set_title('Histograma de Residuos')
-    sm.qqplot(resid, line='s', ax=ax[1])
-    ax[1].set_title('Q-Q Plot')  # Corrección: establecer el título en el eje
-    st.pyplot(fig)
-    jb_p = jarque_bera(resid)[1]
-    st.write(f"Jarque-Bera p-value: {jb_p:.3f}")
+        # 4. Normalidad
+        st.write("**4. Normalidad**")
+        st.write("Histograma y Q-Q Plot de Residuos")
+        fig, ax = plt.subplots(1, 2, figsize=(12, 5))
+        sns.histplot(resid, kde=True, ax=ax[0])
+        ax[0].set_title('Histograma de Residuos')
+        sm.qqplot(resid, line='s', ax=ax[1])
+        ax[1].set_title('Q-Q Plot')
+        st.pyplot(fig)
+        jb_p = jarque_bera(resid)[1]
+        st.write(f"Jarque-Bera p-value: {jb_p:.3f}")
 
-    # 5. No Multicolinealidad
-    st.write("**5. No Multicolinealidad**")
-    vif = [variance_inflation_factor(Xc.values, i) for i in range(Xc.shape[1])]
-    st.write(pd.DataFrame({'Variable': Xc.columns, 'VIF': vif}))
+        # 5. No Multicolinealidad
+        st.write("**5. No Multicolinealidad**")
+        vif = [variance_inflation_factor(Xc.values, i) for i in range(Xc.shape[1])]
+        st.write(pd.DataFrame({'Variable': Xc.columns, 'VIF': vif}))
 
-    # Resumen de supuestos
-    st.subheader("Resumen de Supuestos")
-    st.write(f"- **Linealidad**: Verifica los gráficos de dispersión.")
-    st.write(f"- **Independencia**: Durbin-Watson = {dw:.3f} (debe estar cerca de 2).")
-    st.write(f"- **Homocedasticidad**: Breusch-Pagan p-value = {bp_p:.3f} (debe ser > 0.05).")
-    st.write(f"- **Normalidad**: Jarque-Bera p-value = {jb_p:.3f} (debe ser > 0.05).")
-    st.write(f"- **No Multicolinealidad**: VIF < 10 para todas las variables.")
+        # Resumen de supuestos
+        st.subheader("Resumen de Supuestos")
+        st.write(f"- **Linealidad**: Verifica los gráficos de dispersión.")
+        st.write(f"- **Independencia**: Durbin-Watson = {dw:.3f} (debe estar cerca de 2).")
+        st.write(f"- **Homocedasticidad**: Breusch-Pagan p-value = {bp_p:.3f} (debe ser > 0.05).")
+        st.write(f"- **Normalidad**: Jarque-Bera p-value = {jb_p:.3f} (debe ser > 0.05).")
+        st.write(f"- **No Multicolinealidad**: VIF < 10 para todas las variables.")
+    except Exception as e:
+        st.error(f"Error en la regresión lineal: {str(e)}")
 
-    
 # **Regresión Logística**
 elif option == 'Regresión Logística':
     st.header("Regresión Logística")
@@ -166,41 +175,47 @@ elif option == 'Regresión Logística':
     Xtr_s = sc.transform(Xtr)
     Xte_s = sc.transform(Xte)
 
-    Xtr_s_const = sm.add_constant(Xtr_s)
-    logit_model = sm.Logit(ytr, Xtr_s_const).fit()
-    st.subheader("Summary del Modelo")
-    st.text(logit_model.summary())
+    try:
+        Xtr_s_const = sm.add_constant(Xtr_s)
+        logit_model = sm.Logit(ytr, Xtr_s_const).fit()
+        st.subheader("Summary del Modelo")
+        st.text(logit_model.summary())
+    except Exception as e:
+        st.error(f"Error en el modelo logístico de statsmodels: {str(e)}")
 
-    logit = LogisticRegression().fit(Xtr_s, ytr)
-    pred = logit.predict(Xte_s)
-    proba = logit.predict_proba(Xte_s)[:,1]
+    try:
+        logit = LogisticRegression().fit(Xtr_s, ytr)
+        pred = logit.predict(Xte_s)
+        proba = logit.predict_proba(Xte_s)[:,1]
 
-    st.subheader("Coeficientes")
-    coef_df = pd.DataFrame({'Variable': X.columns, 'Coef': logit.coef_[0], 'Odds Ratio': np.exp(logit.coef_[0])})
-    st.write(coef_df)
+        st.subheader("Coeficientes")
+        coef_df = pd.DataFrame({'Variable': X.columns, 'Coef': logit.coef_[0], 'Odds Ratio': np.exp(logit.coef_[0])})
+        st.write(coef_df)
 
-    st.subheader("Matriz de Confusión")
-    cm = confusion_matrix(yte, pred)
-    fig, ax = plt.subplots()
-    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', ax=ax)
-    ax.set_title('Matriz de Confusión')
-    ax.set_xlabel('Predicción')
-    ax.set_ylabel('Valor Real')
-    st.pyplot(fig)
+        st.subheader("Matriz de Confusión")
+        cm = confusion_matrix(yte, pred)
+        fig, ax = plt.subplots()
+        sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', ax=ax)
+        ax.set_title('Matriz de Confusión')
+        ax.set_xlabel('Predicción')
+        ax.set_ylabel('Valor Real')
+        st.pyplot(fig)
 
-    st.subheader("Curva ROC")
-    fpr, tpr, _ = roc_curve(yte, proba)
-    auc_val = auc(fpr, tpr)
-    fig = px.area(x=fpr, y=tpr, title=f"ROC AUC={auc_val:.3f}", labels={'x':'FPR','y':'TPR'})
-    st.plotly_chart(fig)
+        st.subheader("Curva ROC")
+        fpr, tpr, _ = roc_curve(yte, proba)
+        auc_val = auc(fpr, tpr)
+        fig = px.area(x=fpr, y=tpr, title=f"ROC AUC={auc_val:.3f}", labels={'x':'FPR','y':'TPR'})
+        st.plotly_chart(fig)
 
-    st.subheader("Distribución de Probabilidades Predichas")
-    fig, ax = plt.subplots()
-    ax.hist(proba, bins=50)
-    ax.set_title('Distribución de Probabilidades Predichas')
-    ax.set_xlabel('Probabilidad de Éxito')
-    ax.set_ylabel('Frecuencia')
-    st.pyplot(fig)
+        st.subheader("Distribución de Probabilidades Predichas")
+        fig, ax = plt.subplots()
+        ax.hist(proba, bins=50)
+        ax.set_title('Distribución de Probabilidades Predichas')
+        ax.set_xlabel('Probabilidad de Éxito')
+        ax.set_ylabel('Frecuencia')
+        st.pyplot(fig)
+    except Exception as e:
+        st.error(f"Error en el modelo logístico de scikit-learn: {str(e)}")
 
 # **Árbol de Decisión**
 elif option == 'Árbol de Decisión':
@@ -212,10 +227,13 @@ elif option == 'Árbol de Decisión':
     Xtr_s = sc.transform(Xtr)
     Xte_s = sc.transform(Xte)
 
-    dt = DecisionTreeClassifier(max_depth=4, random_state=42).fit(Xtr_s, ytr)
-    fig, ax = plt.subplots(figsize=(20,10))
-    plot_tree(dt, feature_names=X.columns, class_names=['No Exitoso', 'Exitoso'], filled=True, ax=ax)
-    st.pyplot(fig)
+    try:
+        dt = DecisionTreeClassifier(max_depth=4, random_state=42).fit(Xtr_s, ytr)
+        fig, ax = plt.subplots(figsize=(20,10))
+        plot_tree(dt, feature_names=X.columns, class_names=['No Exitoso', 'Exitoso'], filled=True, ax=ax)
+        st.pyplot(fig)
+    except Exception as e:
+        st.error(f"Error en el árbol de decisión: {str(e)}")
 
 # **Random Forest**
 elif option == 'Random Forest':
@@ -227,33 +245,36 @@ elif option == 'Random Forest':
     Xtr_s = sc.transform(Xtr)
     Xte_s = sc.transform(Xte)
 
-    rf = RandomForestClassifier(n_estimators=100, max_depth=10, random_state=42).fit(Xtr_s, ytr)
-    pred = rf.predict(Xte_s)
-    proba = rf.predict_proba(Xte_s)[:,1]
+    try:
+        rf = RandomForestClassifier(n_estimators=100, max_depth=10, random_state=42).fit(Xtr_s, ytr)
+        pred = rf.predict(Xte_s)
+        proba = rf.predict_proba(Xte_s)[:,1]
 
-    st.subheader("Matriz de Confusión")
-    cm = confusion_matrix(yte, pred)
-    fig, ax = plt.subplots()
-    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', ax=ax)
-    ax.set_title('Matriz de Confusión')
-    ax.set_xlabel('Predicción')
-    ax.set_ylabel('Valor Real')
-    st.pyplot(fig)
+        st.subheader("Matriz de Confusión")
+        cm = confusion_matrix(yte, pred)
+        fig, ax = plt.subplots()
+        sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', ax=ax)
+        ax.set_title('Matriz de Confusión')
+        ax.set_xlabel('Predicción')
+        ax.set_ylabel('Valor Real')
+        st.pyplot(fig)
 
-    st.subheader("Curva ROC")
-    fpr, tpr, _ = roc_curve(yte, proba)
-    auc_val = auc(fpr, tpr)
-    fig = px.area(x=fpr, y=tpr, title=f"ROC AUC={auc_val:.3f}", labels={'x':'FPR','y':'TPR'})
-    st.plotly_chart(fig)
+        st.subheader("Curva ROC")
+        fpr, tpr, _ = roc_curve(yte, proba)
+        auc_val = auc(fpr, tpr)
+        fig = px.area(x=fpr, y=tpr, title=f"ROC AUC={auc_val:.3f}", labels={'x':'FPR','y':'TPR'})
+        st.plotly_chart(fig)
 
-    st.subheader("Importancia de Características")
-    imp = pd.Series(rf.feature_importances_, index=X.columns)
-    st.bar_chart(imp)
+        st.subheader("Importancia de Características")
+        imp = pd.Series(rf.feature_importances_, index=X.columns)
+        st.bar_chart(imp)
 
-    st.subheader("Visualización del Primer Árbol")
-    fig, ax = plt.subplots(figsize=(20,10))
-    plot_tree(rf.estimators_[0], feature_names=X.columns, class_names=['Bajo', 'Alto'], filled=True, max_depth=3, ax=ax)
-    st.pyplot(fig)
+        st.subheader("Visualización del Primer Árbol")
+        fig, ax = plt.subplots(figsize=(20,10))
+        plot_tree(rf.estimators_[0], feature_names=X.columns, class_names=['Bajo', 'Alto'], filled=True, max_depth=3, ax=ax)
+        st.pyplot(fig)
+    except Exception as e:
+        st.error(f"Error en el random forest: {str(e)}")
 
 # **Clustering (K-Means)**
 elif option == 'Clustering':
@@ -285,75 +306,81 @@ elif option == 'Clustering':
 # **ARIMA**
 elif option == 'ARIMA':
     st.header("ARIMA sobre Likes")
-    data['Timestamp'] = pd.to_datetime(data['Timestamp'])
-    ts = data.set_index('Timestamp')['Likes'].resample('D').sum().fillna(0)
-    
-    st.subheader("Prueba de Dickey-Fuller")
-    result = adfuller(ts)
-    st.write(f"ADF Statistic: {result[0]}, p-value: {result[1]}")
-    
-    st.subheader("Autocorrelación")
-    fig, ax = plt.subplots(1, 2, figsize=(12,4))
-    plot_acf(ts, ax=ax[0])
-    plot_pacf(ts, ax=ax[1])
-    st.pyplot(fig)
-    
-    m = ARIMA(ts, order=(1,1,1)).fit()
-    st.subheader("Summary del Modelo")
-    st.text(m.summary())
-    
-    forecast = m.get_forecast(30)
-    f_mean = forecast.predicted_mean
-    f_ci = forecast.conf_int()
-    
-    st.subheader("Pronóstico a 30 días")
-    fig = px.line(ts, title='Serie Temporal de Likes')
-    fig.add_scatter(x=f_mean.index, y=f_mean, name='Pronóstico', line=dict(color='red'))
-    fig.add_scatter(x=f_ci.index, y=f_ci.iloc[:,0], name='CI Inferior', line=dict(dash='dash'))
-    fig.add_scatter(x=f_ci.index, y=f_ci.iloc[:,1], name='CI Superior', line=dict(dash='dash'))
-    st.plotly_chart(fig)
+    try:
+        data['Timestamp'] = pd.to_datetime(data['Timestamp'])
+        ts = data.set_index('Timestamp')['Likes'].resample('D').sum().fillna(0)
+        
+        st.subheader("Prueba de Dickey-Fuller")
+        result = adfuller(ts)
+        st.write(f"ADF Statistic: {result[0]}, p-value: {result[1]}")
+        
+        st.subheader("Autocorrelación")
+        fig, ax = plt.subplots(1, 2, figsize=(12,4))
+        plot_acf(ts, ax=ax[0])
+        plot_pacf(ts, ax=ax[1])
+        st.pyplot(fig)
+        
+        m = ARIMA(ts, order=(1,1,1)).fit()
+        st.subheader("Summary del Modelo")
+        st.text(m.summary())
+        
+        forecast = m.get_forecast(30)
+        f_mean = forecast.predicted_mean
+        f_ci = forecast.conf_int()
+        
+        st.subheader("Pronóstico a 30 días")
+        fig = px.line(ts, title='Serie Temporal de Likes')
+        fig.add_scatter(x=f_mean.index, y=f_mean, name='Pronóstico', line=dict(color='red'))
+        fig.add_scatter(x=f_ci.index, y=f_ci.iloc[:,0], name='CI Inferior', line=dict(dash='dash'))
+        fig.add_scatter(x=f_ci.index, y=f_ci.iloc[:,1], name='CI Superior', line=dict(dash='dash'))
+        st.plotly_chart(fig)
+    except Exception as e:
+        st.error(f"Error en ARIMA: {str(e)}")
 
 # **SARIMAX**
 elif option == 'SARIMAX':
     st.header("SARIMAX sobre Likes")
-    data['Timestamp'] = pd.to_datetime(data['Timestamp'])
-    df = data.set_index('Timestamp').resample('D').sum(numeric_only=True).fillna(0)
-    endog = df['Likes']
-    exog = df[['Retweets', 'Views', 'Replies']]
-    
-    # Eliminar filas con NaN o infinitos en exog
-    exog = exog.replace([np.inf, -np.inf], np.nan).dropna()
-    endog = endog.loc[exog.index]  # Alinear endog con exog
-    
-    st.subheader("Prueba de Dickey-Fuller")
-    result = adfuller(endog)
-    st.write(f"ADF Statistic: {result[0]}, p-value: {result[1]}")
-    
-    st.subheader("Autocorrelación")
-    fig, ax = plt.subplots(1, 2, figsize=(12,4))
-    plot_acf(endog, ax=ax[0])
-    plot_pacf(endog, ax=ax[1])
-    st.pyplot(fig)
-    
-    m = SARIMAX(endog, exog=exog, order=(1,1,1), seasonal_order=(1,1,1,7)).fit(disp=False)
-    st.subheader("Summary del Modelo")
-    st.text(m.summary())
-    
-    # Generar exog_future usando la media de los últimos 30 días
-    exog_future = pd.DataFrame(index=pd.date_range(start=df.index[-1] + pd.Timedelta(days=1), periods=30, freq='D'))
-    for col in exog.columns:
-        exog_future[col] = exog[col].tail(30).mean()
-    
-    forecast = m.get_forecast(steps=30, exog=exog_future)
-    f_mean = forecast.predicted_mean
-    f_ci = forecast.conf_int()
-    
-    st.subheader("Pronóstico a 30 días")
-    fig = px.line(endog, title='Serie Temporal de Likes')
-    fig.add_scatter(x=f_mean.index, y=f_mean, name='Pronóstico', line=dict(color='red'))
-    fig.add_scatter(x=f_ci.index, y=f_ci.iloc[:,0], name='CI Inferior', line=dict(dash='dash'))
-    fig.add_scatter(x=f_ci.index, y=f_ci.iloc[:,1], name='CI Superior', line=dict(dash='dash'))
-    st.plotly_chart(fig)
+    try:
+        data['Timestamp'] = pd.to_datetime(data['Timestamp'])
+        df = data.set_index('Timestamp').resample('D').sum(numeric_only=True).fillna(0)
+        endog = df['Likes']
+        exog = df[['Retweets', 'Views', 'Replies']]
+        
+        # Eliminar filas con NaN o infinitos en exog
+        exog = exog.replace([np.inf, -np.inf], np.nan).dropna()
+        endog = endog.loc[exog.index]  # Alinear endog con exog
+        
+        st.subheader("Prueba de Dickey-Fuller")
+        result = adfuller(endog)
+        st.write(f"ADF Statistic: {result[0]}, p-value: {result[1]}")
+        
+        st.subheader("Autocorrelación")
+        fig, ax = plt.subplots(1, 2, figsize=(12,4))
+        plot_acf(endog, ax=ax[0])
+        plot_pacf(endog, ax=ax[1])
+        st.pyplot(fig)
+        
+        m = SARIMAX(endog, exog=exog, order=(1,1,1), seasonal_order=(1,1,1,7)).fit(disp=False)
+        st.subheader("Summary del Modelo")
+        st.text(m.summary())
+        
+        # Generar exog_future usando la media de los últimos 30 días
+        exog_future = pd.DataFrame(index=pd.date_range(start=df.index[-1] + pd.Timedelta(days=1), periods=30, freq='D'))
+        for col in exog.columns:
+            exog_future[col] = exog[col].tail(30).mean()
+        
+        forecast = m.get_forecast(steps=30, exog=exog_future)
+        f_mean = forecast.predicted_mean
+        f_ci = forecast.conf_int()
+        
+        st.subheader("Pronóstico a 30 días")
+        fig = px.line(endog, title='Serie Temporal de Likes')
+        fig.add_scatter(x=f_mean.index, y=f_mean, name='Pronóstico', line=dict(color='red'))
+        fig.add_scatter(x=f_ci.index, y=f_ci.iloc[:,0], name='CI Inferior', line=dict(dash='dash'))
+        fig.add_scatter(x=f_ci.index, y=f_ci.iloc[:,1], name='CI Superior', line=dict(dash='dash'))
+        st.plotly_chart(fig)
+    except Exception as e:
+        st.error(f"Error en SARIMAX: {str(e)}")
 
 # **Clustering Espacial con Folium**
 elif option == 'Leaflet Clustering':
@@ -404,35 +431,38 @@ elif option == 'NLP':
     if 'Text' not in data.columns:
         st.error("La columna 'Text' no está presente en los datos.")
     else:
-        # Función para limpiar texto
-        def clean_text(text):
-            text = re.sub(r'http\S+', '', text)  # Eliminar URLs
-            text = re.sub(r'[^a-zA-Z\s]', '', text)  # Eliminar caracteres no alfabéticos
-            text = text.lower()  # Convertir a minúsculas
-            return text
+        try:
+            # Función para limpiar texto
+            def clean_text(text):
+                text = re.sub(r'http\S+', '', text)  # Eliminar URLs
+                text = re.sub(r'[^a-zA-Z\s]', '', text)  # Eliminar caracteres no alfabéticos
+                text = text.lower()  # Convertir a minúsculas
+                return text
 
-        # Preprocesar el texto
-        data['Cleaned_Text'] = data['Text'].apply(clean_text)
-        
-        # Análisis de sentimiento
-        st.subheader("Análisis de Sentimiento")
-        data['Sentiment'] = data['Cleaned_Text'].apply(lambda x: TextBlob(x).sentiment.polarity)
-        data['Sentiment_Label'] = data['Sentiment'].apply(lambda x: 'Positivo' if x > 0 else ('Negativo' if x < 0 else 'Neutral'))
-        
-        # Visualización de la distribución de sentimientos
-        sentiment_counts = data['Sentiment_Label'].value_counts()
-        fig, ax = plt.subplots()
-        ax.bar(sentiment_counts.index, sentiment_counts.values, color=['green', 'red', 'gray'])
-        ax.set_xlabel('Sentimiento')
-        ax.set_ylabel('Número de Textos')
-        ax.set_title('Distribución de Sentimientos')
-        st.pyplot(fig)
-        
-        # Nube de palabras
-        st.subheader("Nube de Palabras")
-        all_words = ' '.join(data['Cleaned_Text'])
-        wordcloud = WordCloud(width=800, height=400, background_color='white').generate(all_words)
-        fig, ax = plt.subplots()
-        ax.imshow(wordcloud, interpolation='bilinear')
-        ax.axis('off')
-        st.pyplot(fig)
+            # Preprocesar el texto
+            data['Cleaned_Text'] = data['Text'].apply(clean_text)
+            
+            # Análisis de sentimiento
+            st.subheader("Análisis de Sentimiento")
+            data['Sentiment'] = data['Cleaned_Text'].apply(lambda x: TextBlob(x).sentiment.polarity)
+            data['Sentiment_Label'] = data['Sentiment'].apply(lambda x: 'Positivo' if x > 0 else ('Negativo' if x < 0 else 'Neutral'))
+            
+            # Visualización de la distribución de sentimientos
+            sentiment_counts = data['Sentiment_Label'].value_counts()
+            fig, ax = plt.subplots()
+            ax.bar(sentiment_counts.index, sentiment_counts.values, color=['green', 'red', 'gray'])
+            ax.set_xlabel('Sentimiento')
+            ax.set_ylabel('Número de Textos')
+            ax.set_title('Distribución de Sentimientos')
+            st.pyplot(fig)
+            
+            # Nube de palabras
+            st.subheader("Nube de Palabras")
+            all_words = ' '.join(data['Cleaned_Text'])
+            wordcloud = WordCloud(width=800, height=400, background_color='white').generate(all_words)
+            fig, ax = plt.subplots()
+            ax.imshow(wordcloud, interpolation='bilinear')
+            ax.axis('off')
+            st.pyplot(fig)
+        except Exception as e:
+            st.error(f"Error en NLP: {str(e)}")
